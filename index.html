@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Readium Dashboard</title>
+  <meta name="description" content="A 100% free, no-key news & signals dashboard pulling from DEV.to, Hacker News, Reddit, BBC, Guardian, GitHub, arXiv, Binance, Yahoo Finance and more."/>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%B0%3C/text%3E%3C/svg%3E"/>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+
+<div id="toast"></div>
+<div id="pullIndicator">↓ Pull to refresh</div>
+
+<!-- Mobile search overlay -->
+<div class="mobile-search-overlay" id="mobileSearchOverlay" onclick="closeMobileSearch()"></div>
+<div class="mobile-search-bar" id="mobileSearchBar">
+  <div class="search-wrap" style="flex:1">
+    <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input class="search-input" id="searchInputMobile" type="text" placeholder="Search Readium…" oninput="onSearch(this.value);document.getElementById('searchInput').value=this.value"/>
+    <button class="search-clear" id="searchClearMobile" onclick="clearSearch()">✕</button>
+  </div>
+  <button class="mobile-search-close" onclick="closeMobileSearch()">✕</button>
+</div>
+
+<!-- Drawer overlay -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <div class="drawer-title">✦ Explore</div>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="sb-card">
+    <div class="sb-title">🔥 Trending Tags</div>
+    <div class="tags-cloud" id="trendingTagsDrawer"><div style="font-size:.75rem;color:var(--text-muted)">Load an article feed first.</div></div>
+  </div>
+  <div class="sb-card">
+    <div class="sb-title">✍️ Top Authors</div>
+    <div class="author-list" id="topAuthorsDrawer"><div style="font-size:.75rem;color:var(--text-muted)">Load an article feed first.</div></div>
+  </div>
+  <div class="sb-card">
+    <div class="sb-title">📖 Reading History</div>
+    <div class="history-list" id="readingHistoryDrawer"><div style="font-size:.75rem;color:var(--text-muted)">No history yet.</div></div>
+  </div>
+</div>
+
+<header>
+  <div class="logo">
+    <span class="logo-r">R</span><span class="logo-rest">eadium</span><span class="logo-dot">.</span>
+  </div>
+  <div class="header-center">
+    <div class="search-wrap">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input class="search-input" id="searchInput" type="text" placeholder="Search Readium…" oninput="onSearch(this.value)"/>
+      <button class="search-clear" id="searchClear" onclick="clearSearch()">✕</button>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="live-dot"></div><span class="live-text">Live</span></div>
+    <!-- Mobile-only search icon -->
+    <button class="icon-btn" id="mobileSearchBtn" onclick="openMobileSearch()" title="Search" style="display:none">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    </button>
+    <button class="icon-btn" id="darkModeBtn" onclick="toggleDarkMode()" title="Toggle dark mode">
+      <svg id="darkIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <button class="icon-btn" id="refreshBtn" onclick="loadFeed()" title="Refresh">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="tabs-row">
+  <div class="tabs-scroll" id="tabsScroll">
+    <button class="tab-btn active" onclick="selectTopic(this,'programming','💻 Programming')">💻 Programming</button>
+    <button class="tab-btn" onclick="selectTopic(this,'ai','🤖 AI')">🤖 AI</button>
+    <button class="tab-btn" onclick="selectTopic(this,'datascience','📊 Data Science')">📊 Data Science</button>
+    <button class="tab-btn" onclick="selectTopic(this,'technology','⚡ Technology')">⚡ Technology</button>
+    <button class="tab-btn" onclick="selectTopic(this,'startup','🚀 Startup')">🚀 Startup</button>
+    <button class="tab-btn" onclick="selectTopic(this,'design','🎨 Design')">🎨 Design</button>
+    <button class="tab-btn" onclick="selectTopic(this,'science','🔬 Science')">🔬 Science</button>
+    <button class="tab-btn" onclick="selectTopic(this,'health','💊 Health')">💊 Health</button>
+    <button class="tab-btn" onclick="selectTopic(this,'finance','💰 Finance')">💰 Finance</button>
+    <button class="tab-btn" onclick="selectTopic(this,'python','🐍 Python')">🐍 Python</button>
+    <button class="tab-btn" onclick="selectTopic(this,'javascript','🟨 JavaScript')">🟨 JavaScript</button>
+    <button class="tab-btn" onclick="selectTopic(this,'security','🔐 Security')">🔐 Security</button>
+    <button class="tab-btn" onclick="selectTopic(this,'machinelearning','🧠 ML')">🧠 ML</button>
+    <button class="tab-btn" onclick="selectTopic(this,'blockchain','⛓️ Crypto')">⛓️ Crypto</button>
+    <button class="tab-btn" onclick="selectTopic(this,'gaming','🎮 Gaming')">🎮 Gaming</button>
+    <div class="tab-divider"></div>
+    <button class="tab-btn" onclick="selectTopic(this,'stocks','📈 Stocks')">📈 Stocks</button>
+    <button class="tab-btn" onclick="selectTopic(this,'forex','💱 Forex')">💱 Forex</button>
+    <button class="tab-btn" onclick="selectTopic(this,'commodities','🥇 Commodities')">🥇 Commodities</button>
+    <div class="tab-divider"></div>
+    <button class="tab-btn" onclick="selectTopic(this,'education','🎓 Education')">🎓 Education</button>
+    <button class="tab-btn" onclick="selectTopic(this,'career','💼 Career')">💼 Career</button>
+    <button class="tab-btn" onclick="selectTopic(this,'llm','🧬 LLM')">🧬 LLM</button>
+    <button class="tab-btn" onclick="selectTopic(this,'research','🔭 Research')">🔭 Research</button>
+    <button class="tab-btn" onclick="selectTopic(this,'jobs','🏢 Jobs')">🏢 Jobs</button>
+    <button class="tab-btn" onclick="selectTopic(this,'remotejobs','🌍 Remote Jobs')">🌍 Remote Jobs</button>
+    <button class="tab-btn" onclick="selectTopic(this,'entertainment','🎬 Entertainment')">🎬 Entertainment</button>
+    <button class="tab-btn" onclick="selectTopic(this,'news','📰 News')">📰 News</button>
+    <div class="tab-divider"></div>
+    <button class="tab-btn saved-tab" onclick="selectTopic(this,'__saved__','🔖 Saved')">🔖 Saved</button>
+  </div>
+</div>
+
+<!-- News sub-filter bar -->
+<div class="news-subfilter" id="newsSubfilter">
+  <span class="nsf-label">Scope:</span>
+  <button class="nsf-pill active" id="nsfGlobal" onclick="selectNewsScope(this,'global')">🌍 Global</button>
+  <button class="nsf-pill" id="nsfCountry" onclick="selectNewsScope(this,'country')">🗺️ Country</button>
+  <button class="nsf-pill" id="nsfLocal" onclick="selectNewsScope(this,'local')">📍 Local</button>
+  <select class="country-select" id="newsCountrySelect" onchange="loadCountryNews()">
+    <option value="us">🇺🇸 USA</option>
+    <option value="gb">🇬🇧 UK</option>
+    <option value="in">🇮🇳 India</option>
+    <option value="au">🇦🇺 Australia</option>
+    <option value="ca">🇨🇦 Canada</option>
+    <option value="de">🇩🇪 Germany</option>
+    <option value="fr">🇫🇷 France</option>
+    <option value="jp">🇯🇵 Japan</option>
+    <option value="br">🇧🇷 Brazil</option>
+    <option value="za">🇿🇦 South Africa</option>
+    <option value="sg">🇸🇬 Singapore</option>
+    <option value="ae">🇦🇪 UAE</option>
+    <option value="ng">🇳🇬 Nigeria</option>
+    <option value="mx">🇲🇽 Mexico</option>
+    <option value="kr">🇰🇷 South Korea</option>
+  </select>
+</div>
+
+<div class="toolbar">
+  <div class="toolbar-left">
+    <div class="count-pill" id="countPill">Loading…</div>
+    <select class="sort-select" id="sortSelect" onchange="applySort()">
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+      <option value="readtime">Shortest read</option>
+    </select>
+  </div>
+  <div class="auto-badge">⏱ <span id="countdownTxt">10:00</span></div>
+</div>
+
+<div class="page">
+  <div class="stats-strip" id="statsStrip">
+    <div class="stat-card"><div class="stat-icon">📰</div><div><div class="stat-value" id="sArticles"><div class="skeleton sk-h" style="width:36px"></div></div><div class="stat-label">Articles</div></div></div>
+    <div class="stat-card"><div class="stat-icon">🗞️</div><div><div class="stat-value" id="sAuthors"><div class="skeleton sk-h" style="width:28px"></div></div><div class="stat-label">Authors</div></div></div>
+    <div class="stat-card"><div class="stat-icon">🏷️</div><div><div class="stat-value" id="sTopic"><div class="skeleton sk-h" style="width:60px"></div></div><div class="stat-label">Topic</div></div></div>
+    <div class="stat-card"><div class="stat-icon">🔖</div><div><div class="stat-value" id="sSaved">0</div><div class="stat-label">Saved</div></div></div>
+    <div class="stat-card"><div class="stat-icon">👁️</div><div><div class="stat-value" id="sRead">0</div><div class="stat-label">Read</div></div></div>
+    <div class="stat-card"><div class="stat-icon">🕐</div><div><div class="stat-value" id="sTime"><div class="skeleton sk-h" style="width:40px"></div></div><div class="stat-label">Updated</div></div></div>
+  </div>
+
+  <div class="articles-col">
+    <div class="section-hd">
+      <div class="section-title" id="sectionTitle">Latest Articles</div>
+      <div class="source-label" id="sourceLabel">DEV.to + HN</div>
+    </div>
+
+    <!-- SIGNALS PANEL — shown only for Crypto / Stocks / Forex / Commodities tabs -->
+    <div id="signalsPanel" class="signals-panel" style="display:none">
+      <div class="signals-header">
+        <div class="signals-header-left">
+          <span class="signals-title" id="signalsTitle">📊 Live Signals</span>
+          <span class="signals-sub">· 24h change</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          <span class="signals-time" id="signalsTime"></span>
+          <button class="signals-refresh-btn" onclick="loadSignals()">↺ Refresh</button>
+        </div>
+      </div>
+      <div id="signalsContainer" class="signals-strip">
+        <div class="signals-loading"><div class="live-dot"></div> Loading signals…</div>
+      </div>
+      <div class="signals-disclaimer">⚠️ Signals are algorithmic &amp; informational only. Not financial advice. Data: Binance · CoinCap · CoinGecko · Yahoo Finance · ExchangeRate · Frankfurter · metals.live · Alternative.me</div>
+    </div>
+
+    <!-- ENTERTAINMENT SHOWCASE — shown only for Entertainment tab -->
+    <div id="entertainmentPanel" style="display:none">
+      <div class="ent-panel" id="localEntPanel">
+        <div class="ent-panel-header">
+          <div>
+            <div class="ent-panel-title">🎬 Entertainment Showcase</div>
+            <div class="ent-panel-sub" id="entLocLabel">TV · Movies · Games · No key required</div>
+          </div>
+          <button class="ent-loc-btn" id="entLocBtn" onclick="loadEntShowcasePlatform(currentEntPlatform)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+            Refresh
+          </button>
+        </div>
+        <!-- Platform Filter Tabs -->
+        <div class="ent-platform-tabs" id="entPlatformTabs">
+          <button class="ept-btn active" id="eptAll" onclick="selectEntPlatform(this,'all')">🎬 All</button>
+          <button class="ept-btn" id="eptImdb" onclick="selectEntPlatform(this,'imdb')">⭐ IMDb</button>
+          <button class="ept-btn" id="eptNetflix" onclick="selectEntPlatform(this,'netflix')">🔴 Netflix</button>
+          <button class="ept-btn" id="eptAmazon" onclick="selectEntPlatform(this,'amazon')">📦 Amazon</button>
+          <button class="ept-btn" id="eptHotstar" onclick="selectEntPlatform(this,'hotstar')">🌟 Hotstar</button>
+        </div>
+        <div id="entContent">
+          <div style="display:flex;align-items:center;gap:.5rem;padding:.85rem 1.1rem;font-size:.78rem;color:var(--text-muted)">
+            <div class="live-dot" style="background:var(--accent)"></div>Loading showcase…
+          </div>
+        </div>
+        <div class="ent-disclaimer">📺 TVMaze · 🎬 IMDb · 📦 Amazon · 🔴 Netflix · ⭐ Hotstar · 🎮 RAWG · 100% free, no API key</div>
+      </div>
+    </div>
+
+    <div id="articlesContainer"></div>
+  </div>
+
+  <div class="sidebar">
+    <div class="sb-card">
+      <div class="sb-title">🔥 Trending Tags</div>
+      <div class="tags-cloud" id="trendingTags">
+        <div class="skeleton sk-h" style="width:56px;height:24px;border-radius:20px"></div>
+        <div class="skeleton sk-h" style="width:72px;height:24px;border-radius:20px"></div>
+        <div class="skeleton sk-h" style="width:48px;height:24px;border-radius:20px"></div>
+        <div class="skeleton sk-h" style="width:80px;height:24px;border-radius:20px"></div>
+      </div>
+    </div>
+    <div class="sb-card">
+      <div class="sb-title">✍️ Top Authors</div>
+      <div class="author-list" id="topAuthors">
+        <div class="author-item"><div class="skeleton" style="width:34px;height:34px;border-radius:50%"></div><div style="flex:1;display:flex;flex-direction:column;gap:5px"><div class="skeleton sk-h sk-med"></div><div class="skeleton sk-h sk-short"></div></div></div>
+        <div class="author-item"><div class="skeleton" style="width:34px;height:34px;border-radius:50%"></div><div style="flex:1;display:flex;flex-direction:column;gap:5px"><div class="skeleton sk-h sk-med"></div><div class="skeleton sk-h sk-short"></div></div></div>
+      </div>
+    </div>
+    <div class="sb-card">
+      <div class="sb-title">📖 Reading History</div>
+      <div class="history-list" id="readingHistory"><div style="font-size:.75rem;color:var(--text-muted)">No history yet.</div></div>
+    </div>
+    <div class="sb-card sb-cta">
+      <div class="sb-title">🌐 Explore More</div>
+      <p style="font-size:.78rem;color:var(--text-secondary);line-height:1.6;margin-bottom:.65rem">Dive deeper across all sources powering Readium.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:.4rem;">
+        <a href="https://dev.to" target="_blank" rel="noopener" style="display:inline-block;background:#2e7d32;color:#fff;font-size:.7rem;font-weight:600;padding:.32rem .75rem;border-radius:6px;text-decoration:none;">DEV.to ↗</a>
+        <a href="https://news.ycombinator.com" target="_blank" rel="noopener" style="display:inline-block;background:#e65100;color:#fff;font-size:.7rem;font-weight:600;padding:.32rem .75rem;border-radius:6px;text-decoration:none;">HN ↗</a>
+        <a href="https://reddit.com" target="_blank" rel="noopener" style="display:inline-block;background:#ff4500;color:#fff;font-size:.7rem;font-weight:600;padding:.32rem .75rem;border-radius:6px;text-decoration:none;">Reddit ↗</a>
+        <a href="https://medium.com" target="_blank" rel="noopener" style="display:inline-block;background:#37474f;color:#fff;font-size:.7rem;font-weight:600;padding:.32rem .75rem;border-radius:6px;text-decoration:none;">Medium ↗</a>
+        <a href="https://xda-developers.com" target="_blank" rel="noopener" style="display:inline-block;background:#1565c0;color:#fff;font-size:.7rem;font-weight:600;padding:.32rem .75rem;border-radius:6px;text-decoration:none;">XDA ↗</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">Readium · DEV.to · HN · Reddit · Medium · XDA · freeCodeCamp · TechCrunch · The Guardian · The Verge · IGN · Ars Technica · GitHub · HuggingFace · PapersWithCode · arXiv · BBC · Al Jazeera · NPR · IMDb · TVMaze · RAWG · RemoteOK · CoinGecko · Binance · CoinCap · Fear&amp;Greed · Yahoo Finance · ExchangeRate · Frankfurter · metals.live · 100% free</div>
+</div>
+
+<!-- Bottom Navigation (mobile only) -->
+<nav class="bottom-nav" id="bottomNav">
+  <div class="bnav-inner">
+    <button class="bnav-btn active" id="bnavHome" onclick="bnavSelect('home')" title="Home">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="bnav-btn" id="bnavSearch" onclick="openMobileSearch()" title="Search">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <span>Search</span>
+    </button>
+    <button class="bnav-btn" id="bnavSaved" onclick="bnavSelect('saved')" title="Saved">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      <span>Saved</span>
+    </button>
+    <button class="bnav-btn" id="bnavExplore" onclick="openDrawer()" title="Explore">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+      <span>Explore</span>
+    </button>
+    <button class="bnav-btn" id="bnavDark" onclick="toggleDarkMode()" title="Dark mode">
+      <svg id="bnavDarkIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <span>Theme</span>
+    </button>
+  </div>
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>
