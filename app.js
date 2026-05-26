@@ -580,22 +580,70 @@ async function fetchCryptoSignals() {
   });
 }
 
-// ── Stock signals via Yahoo Finance (via allorigins proxy) ──
+// ── Stock signals — 3-layer fallback ──
 async function fetchStockSignals() {
   const symbols = ['AAPL','MSFT','GOOGL','AMZN','META','TSLA','NVDA','AMD','SPY','QQQ'];
-  const yfUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(',')}`;
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(yfUrl)}`;
-  const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(18000) });
-  if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
-  const wrapper = await res.json();
-  let parsed;
-  try { parsed = JSON.parse(wrapper.contents); } catch(e) { throw new Error('Invalid stock data'); }
-  const results = parsed?.quoteResponse?.result || [];
-  if (!results.length) throw new Error('No stock quotes returned');
-  return results.map(q => {
-    const chg = q.regularMarketChangePercent || 0;
-    return { symbol: q.symbol, name: (q.shortName||q.displayName||q.symbol).slice(0,18), price: q.regularMarketPrice, change: chg, signal: signalLabel(chg, 1.5, -1.5) };
-  });
+
+  // Layer 1: Yahoo Finance v7 via query2 (sometimes less rate-limited than query1)
+  try {
+    const yfUrl = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(',')}`;
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(yfUrl)}`;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+    if (res.ok) {
+      const wrapper = await res.json();
+      const parsed = JSON.parse(wrapper.contents);
+      const results = parsed?.quoteResponse?.result || [];
+      if (results.length >= 3) {
+        return results.map(q => {
+          const chg = q.regularMarketChangePercent || 0;
+          return { symbol: q.symbol, name: (q.shortName||q.displayName||q.symbol).slice(0,18), price: q.regularMarketPrice, change: chg, signal: signalLabel(chg, 1.5, -1.5) };
+        });
+      }
+    }
+  } catch(e) { console.warn('YF query2 v7:', e.message); }
+
+  // Layer 2: Yahoo Finance v8 chart endpoint (individual symbols, no crumb needed)
+  try {
+    const keySyms = ['AAPL','MSFT','NVDA','TSLA','AMZN','META','GOOGL','AMD'];
+    const fetches = keySyms.map(async sym => {
+      const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=2d`;
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(yfUrl)}`;
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) throw new Error(`${sym} HTTP ${res.status}`);
+      const wrapper = await res.json();
+      const data = JSON.parse(wrapper.contents);
+      const meta = data?.chart?.result?.[0]?.meta;
+      if (!meta) throw new Error(`${sym}: no meta`);
+      const price = meta.regularMarketPrice;
+      const prevClose = meta.chartPreviousClose;
+      const chg = (price && prevClose) ? ((price - prevClose) / prevClose) * 100 : 0;
+      return { symbol: sym, name: sym, price, change: chg, signal: signalLabel(chg, 1.5, -1.5) };
+    });
+    const results = await Promise.allSettled(fetches);
+    const stocks = results.filter(r => r.status === 'fulfilled').map(r => r.value);
+    if (stocks.length >= 3) return stocks;
+  } catch(e) { console.warn('YF v8 chart:', e.message); }
+
+  // Layer 3: Stooq CSV (free, no key, very reliable)
+  try {
+    const stooqSyms = 'aapl.us,msft.us,nvda.us,tsla.us,amzn.us,meta.us,googl.us,amd.us';
+    const stooqUrl = `https://stooq.com/q/l/?s=${stooqSyms}&f=sd2ohlcv&h&e=csv`;
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(stooqUrl)}`;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(14000) });
+    if (!res.ok) throw new Error(`Stooq HTTP ${res.status}`);
+    const wrapper = await res.json();
+    const lines = (wrapper.contents||'').trim().split('\n').slice(1);
+    const stocks = lines.map(line => {
+      const cols = line.split(',');
+      const sym = (cols[0]||'').replace(/\.US$/i,'').toUpperCase();
+      const open = parseFloat(cols[2]), close = parseFloat(cols[5]);
+      const chg = (close && open) ? ((close - open) / open) * 100 : 0;
+      return { symbol: sym, name: sym, price: close, change: chg, signal: signalLabel(chg, 1.5, -1.5) };
+    }).filter(s => s.symbol && !isNaN(s.price) && s.price > 0);
+    if (stocks.length >= 3) return stocks;
+  } catch(e) { console.warn('Stooq:', e.message); }
+
+  throw new Error('No stock quotes returned');
 }
 
 // ── Forex signals via Frankfurter API (free, no key, historical) ──
