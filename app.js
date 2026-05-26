@@ -1318,7 +1318,20 @@ async function fetchBBCWorld() {
 }
 
 async function fetchAlJazeera() {
-  const items = await fetchRSSWithFallback('https://www.aljazeera.com/xml/rss/all.xml', 20);
+  // Try multiple known Al Jazeera RSS URLs in sequence
+  const ajUrls = [
+    'https://www.aljazeera.com/xml/rss/all.xml',
+    'https://www.aljazeera.com/rss/news.xml',
+    'https://www.aljazeera.net/rss/all.xml'
+  ];
+  let items = null;
+  for (const rssUrl of ajUrls) {
+    try {
+      items = await fetchRSSWithFallback(rssUrl, 20);
+      if (items && items.length) break;
+    } catch(e) {}
+  }
+  if (!items || !items.length) throw new Error('Al Jazeera: all feed URLs failed');
   return items.map(a => ({
     title: a.title, link: a.link, author: 'Al Jazeera',
     pubDate: a.pubDate,
@@ -1374,6 +1387,16 @@ async function fetchLocalNewsGeo() {
   });
 }
 
+async function fetchAPNews() {
+  const items = await fetchRSSWithFallback('https://rsshub.app/apnews/topics/apf-topnews', 15);
+  return items.map(a => ({
+    title: a.title, link: a.link, author: 'AP News',
+    pubDate: a.pubDate,
+    description: (a.description||'').replace(/<[^>]+>/g,'').slice(0,200),
+    thumb: a.thumbnail||'', categories: ['world','news'], readTime: 3, source: 'bbc'
+  }));
+}
+
 function selectNewsScope(btn, scope) {
   document.querySelectorAll('.nsf-pill').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -1396,15 +1419,19 @@ async function loadNewsFeed(scope) {
     let results = [], labels = [];
     if (scope === 'global') {
       currentLabel = '📰 World News';
-      const [bbc, aj, guardian, hn, npr] = await Promise.allSettled([
+      const [bbc, aj, guardian, hn, npr, worldnews, newsRed, ap] = await Promise.allSettled([
         fetchBBCWorld(), fetchAlJazeera(), fetchGuardian('world'),
-        fetchHN('world news breaking current events'), fetchNPRNews()
+        fetchHN('world news breaking current events'), fetchNPRNews(),
+        fetchReddit('worldnews'), fetchReddit('news'), fetchAPNews()
       ]);
       if (bbc.status==='fulfilled') { results.push(...bbc.value); labels.push('BBC'); }
       if (aj.status==='fulfilled') { results.push(...aj.value); labels.push('Al Jazeera'); }
       if (guardian.status==='fulfilled') { results.push(...guardian.value); labels.push('Guardian'); }
       if (hn.status==='fulfilled') results.push(...hn.value);
       if (npr.status==='fulfilled') { results.push(...npr.value); labels.push('NPR'); }
+      if (worldnews.status==='fulfilled') { results.push(...worldnews.value); labels.push('r/worldnews'); }
+      if (newsRed.status==='fulfilled') results.push(...newsRed.value);
+      if (ap.status==='fulfilled') { results.push(...ap.value); labels.push('AP'); }
     } else if (scope === 'country') {
       const country = document.getElementById('newsCountrySelect').value;
       const info = COUNTRY_NEWS_MAP[country] || COUNTRY_NEWS_MAP['us'];
